@@ -29,7 +29,7 @@ st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
 # Google Sheets Setup
 SHEET_URL = "https://docs.google.com/forms/d/1XAqL--awAaFFszSMcJXNd2tb2RUv1mxie7eDsAoLZR4/edit"  # Replace with your actual Google Sheet URL
-SERVICE_ACCOUNT_FILE = "C:\Users\lica_\OneDrive\Documentos\INTERCÂMBIO CCI 2024\2024 Summer-Fall Semester\CIP\Bonita\client_secret_52289991427-88rpm95o3aic7fsk4ueb0sert5uf6l74.apps.googleusercontent.com.json"  # Replace with your JSON file path
+SERVICE_ACCOUNT_FILE = r"C:\Users\lica_\OneDrive\Documentos\INTERCÂMBIO CCI 2024\2024 Summer-Fall Semester\CIP\Bonita\client_secret_52289991427-88rpm95o3aic7fsk4ueb0sert5uf6l74.apps.googleusercontent.com.json"  # Replace with your JSON file path
 
 # Authenticate and fetch data from Google Sheets
 @st.cache_data
