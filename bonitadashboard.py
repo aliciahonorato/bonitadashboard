@@ -8,16 +8,16 @@ def set_custom_css():
     st.markdown("""
         <style>
             body, .stText, .stTitle, .stHeader, .stMarkdown {
-                color: #3b5c3d !important;  /* Verde escuro */
+                color: #faf6f5 !important;  /* Branco claro para as letras */
             }
             .stApp {
-                background-color: #faf6f5 !important;  /* Bege claro */
+                background-color: #3b5c3d !important;  /* Verde escuro para o fundo */
             }
             .stMetric {
-                color: #7c7f46 !important;  /* Verde oliva */
+                color: #f5e7cc !important;  /* Bege claro para as métricas */
             }
             .stDataFrame {
-                background-color: #f5e7cc !important; /* Tom pastel */
+                background-color: #7c7f46 !important; /* Verde oliva claro para a tabela */
             }
         </style>
     """, unsafe_allow_html=True)
