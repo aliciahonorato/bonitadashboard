@@ -4,14 +4,48 @@ import gspread
 from google.oauth2.service_account import Credentials
 import matplotlib.pyplot as plt
 
+# Define Custom Colors
+PRIMARY_COLOR = "#3b5c3d"  # Títulos e destaques
+SECONDARY_COLOR = "#ffbb7c"  # Gráficos
+ACCENT_COLOR = "#e59153"  # Números importantes
+BACKGROUND_COLOR = "#faf6f5"  # Fundo geral
+TEXT_COLOR = "#7c7f46"  # Texto principal
+
+# Apply Custom Styling
+st.markdown(
+    f"""
+    <style>
+        body {{
+            background-color: {BACKGROUND_COLOR};
+            color: {TEXT_COLOR};
+            font-family: 'Arial', sans-serif;
+        }}
+        .stApp {{
+            background-color: {BACKGROUND_COLOR};
+        }}
+        .stTitle {{
+            color: {PRIMARY_COLOR};
+            font-size: 2.2em;
+            font-weight: bold;
+        }}
+        .stMetric {{
+            background-color: {SECONDARY_COLOR};
+            color: {ACCENT_COLOR};
+            border-radius: 10px;
+            padding: 10px;
+        }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # Dashboard Title
-st.title("Performance Indicator Dashboard for SMEs")
+st.title("🌿 Bonita Brazilian Braids Performance Dashboard")
 
 # Google Sheets Setup
-SHEET_URL = "YOUR_GOOGLE_SHEET_URL_HERE"  # Replace with your actual Google Sheet URL
-SERVICE_ACCOUNT_FILE = "your-service-account.json"  # Replace with your JSON file path
+SHEET_URL = "YOUR_GOOGLE_SHEET_URL_HERE"
+SERVICE_ACCOUNT_FILE = "your-service-account.json"
 
-# Authenticate and fetch data from Google Sheets
 @st.cache_data
 def load_google_sheets():
     try:
@@ -22,45 +56,44 @@ def load_google_sheets():
         data = pd.DataFrame(sheet.get_all_records())
         return data
     except Exception as e:
-        st.error(f"Error loading Google Sheet: {e}")
+        st.error(f"⚠️ Error loading Google Sheet: {e}")
         return None
 
 # File Upload Option
-uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+uploaded_file = st.file_uploader("📤 Upload CSV file", type=["csv"])
 
 if uploaded_file:
-    # Load CSV Data
     data = pd.read_csv(uploaded_file, delimiter=';')
 elif SHEET_URL:
-    # Load Google Sheets Data
     data = load_google_sheets()
 else:
     data = None
 
 if data is not None and not data.empty:
-    st.write("### Loaded Data:")
+    st.write("### 📊 Loaded Data:")
     st.dataframe(data)
 
-    # Ensure necessary columns exist
     required_columns = ["Date", "Sales", "Revenue", "Customer_ID", "Region", "Retention Status"]
     if not all(col in data.columns for col in required_columns):
-        st.error(f"The data must contain: {', '.join(required_columns)}")
+        st.error(f"🚨 The data must contain: {', '.join(required_columns)}")
     else:
-        # Convert 'Date' to datetime
         data["Date"] = pd.to_datetime(data["Date"])
-
-        # Metrics
         total_sales = data["Sales"].sum()
         total_revenue = data["Revenue"].sum()
         customer_retention_rate = (data["Retention Status"].str.lower() == "yes").mean() * 100
 
-        st.metric("Total Sales", f"{total_sales}")
-        st.metric("Total Revenue", f"${total_revenue:,.2f}")
-        st.metric("Customer Retention Rate", f"{customer_retention_rate:.2f}%")
+        # Metrics with Custom Styling
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Sales", f"{total_sales}", help="Total number of sales")
+        with col2:
+            st.metric("Total Revenue", f"${total_revenue:,.2f}", help="Total revenue generated")
+        with col3:
+            st.metric("Customer Retention", f"{customer_retention_rate:.2f}%", help="Percentage of returning customers")
 
         # Sales Over Time
-        st.write("### Sales Performance Over Time")
-        sales_timeframe = st.selectbox("Choose timeframe", ["Daily", "Weekly", "Monthly"])
+        st.write("### 📈 Sales Performance Over Time")
+        sales_timeframe = st.selectbox("⏳ Choose timeframe", ["Daily", "Weekly", "Monthly"])
         if sales_timeframe == "Daily":
             sales_over_time = data.groupby(data["Date"].dt.date)["Sales"].sum()
         elif sales_timeframe == "Weekly":
@@ -69,33 +102,36 @@ if data is not None and not data.empty:
             sales_over_time = data.groupby(data["Date"].dt.to_period("M"))["Sales"].sum()
 
         fig, ax = plt.subplots()
-        sales_over_time.plot(ax=ax, kind="line")
-        ax.set_title(f"Sales ({sales_timeframe})")
-        ax.set_ylabel("Sales")
-        ax.set_xlabel("Time")
+        sales_over_time.plot(ax=ax, kind="line", color=SECONDARY_COLOR)
+        ax.set_title(f"Sales ({sales_timeframe})", color=PRIMARY_COLOR)
+        ax.set_ylabel("Sales", color=TEXT_COLOR)
+        ax.set_xlabel("Time", color=TEXT_COLOR)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         st.pyplot(fig)
 
         # Sales by Region
-        st.write("### Sales by Region")
+        st.write("### 🏠 Sales by Region")
         sales_by_region = data.groupby("Region")["Sales"].sum()
         fig, ax = plt.subplots()
-        sales_by_region.plot(ax=ax, kind="bar", color="skyblue")
-        ax.set_title("Sales by Region")
-        ax.set_ylabel("Sales")
-        ax.set_xlabel("Region")
+        sales_by_region.plot(ax=ax, kind="bar", color=SECONDARY_COLOR)
+        ax.set_title("Sales by Region", color=PRIMARY_COLOR)
+        ax.set_ylabel("Sales", color=TEXT_COLOR)
+        ax.set_xlabel("Region", color=TEXT_COLOR)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         st.pyplot(fig)
 
-        # Revenue Growth Calculation
+        # Growth Rate
         if "Growth Rate" not in data.columns:
             data["Growth Rate"] = data["Revenue"].pct_change() * 100
-
         avg_growth_rate = data["Growth Rate"].mean()
-        st.metric("Average Growth Rate", f"{avg_growth_rate:.2f}%")
+        st.metric("📈 Average Growth Rate", f"{avg_growth_rate:.2f}%", help="Average revenue growth over time")
 
-        # Insights Section
-        st.write("### Additional Insights")
-        st.write("Top 5 Customers by Revenue:")
+        # Insights
+        st.write("### 🔎 Additional Insights")
+        st.write("🏆 **Top 5 Customers by Revenue:**")
         top_customers = data.groupby("Customer_ID")["Revenue"].sum().nlargest(5)
         st.table(top_customers)
 else:
-    st.write("Please upload a CSV file or connect a Google Sheet to get started.")
+    st.write("🚀 Upload a CSV file or connect a Google Sheet to get started.")
