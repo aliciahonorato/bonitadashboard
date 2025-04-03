@@ -33,7 +33,7 @@ SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8
 
 # Load credentials from Streamlit Secrets
 credentials_dict = st.secrets["gcp_service_account"]
-credentials = Credentials.from_service_account_info(dict(credentials_dict))
+credentials = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]))
 gc = gspread.authorize(credentials)
 
 # Authenticate and fetch data from Google Sheets
