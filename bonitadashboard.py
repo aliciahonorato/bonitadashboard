@@ -24,21 +24,24 @@ def set_custom_css():
 
 set_custom_css()
 
-# Dashboard Title
+# Título do Dashboard
 st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
-# Google Sheets Setup
+# URLs das planilhas do Google Sheets
 SHEET_URL_CUSTOMER = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?usp=sharing"  
 SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"  
 
-# Load credentials from Streamlit Secrets
-credentials_dict = st.secrets["gcp_service_account"]
-credentials = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]))
+# Definição dos escopos para acesso ao Google Sheets e ao Google Drive
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+# Carrega as credenciais a partir dos secrets e autoriza o gspread
+credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
 gc = gspread.authorize(credentials)
 
-st.write(st.secrets["gcp_service_account"])
-
-# Authenticate and fetch data from Google Sheets
+# Função para carregar os dados de uma Google Sheet
 @st.cache_data
 def load_google_sheets(sheet_url):
     try:
@@ -49,7 +52,7 @@ def load_google_sheets(sheet_url):
         st.error(f"Error loading Google Sheet: {e}")
         return None
 
-# Selection between Customer Feedback and Inventory Management
+# Seleção entre Feedback de Clientes e Gerenciamento de Estoque
 data_type = st.selectbox("Select Data Type", ["Customer Feedback", "Inventory Management"])
 
 if data_type == "Customer Feedback":
@@ -76,7 +79,7 @@ if data is not None and not data.empty:
             st.metric("Total Revenue", f"${total_revenue:,.2f}")
             st.metric("Customer Retention Rate", f"{customer_retention_rate:.2f}%")
 
-            # Sales Over Time
+            # Gráfico de Vendas ao Longo do Tempo
             st.write("### Sales Performance Over Time")
             sales_timeframe = st.selectbox("Choose timeframe", ["Daily", "Weekly", "Monthly"])
             if sales_timeframe == "Daily":
@@ -93,7 +96,7 @@ if data is not None and not data.empty:
             ax.set_xlabel("Time")
             st.pyplot(fig)
 
-            # Sales by Region
+            # Gráfico de Vendas por Região
             st.write("### Sales by Region")
             sales_by_region = data.groupby("Region")["Sales"].sum()
             fig, ax = plt.subplots()
@@ -103,14 +106,14 @@ if data is not None and not data.empty:
             ax.set_xlabel("Region")
             st.pyplot(fig)
 
-            # Revenue Growth
+            # Crescimento da Receita
             if "Growth Rate" not in data.columns:
                 data["Growth Rate"] = data["Revenue"].pct_change() * 100
 
             avg_growth_rate = data["Growth Rate"].mean()
             st.metric("Average Growth Rate", f"{avg_growth_rate:.2f}%")
 
-            # Top Customers
+            # Top 5 Clientes por Receita
             st.write("### Top 5 Customers by Revenue")
             top_customers = data.groupby("Customer_ID")["Revenue"].sum().nlargest(5)
             st.table(top_customers)
