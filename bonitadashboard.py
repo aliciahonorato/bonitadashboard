@@ -36,6 +36,8 @@ credentials_dict = st.secrets["gcp_service_account"]
 credentials = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]))
 gc = gspread.authorize(credentials)
 
+st.write(st.secrets["gcp_service_account"])
+
 # Authenticate and fetch data from Google Sheets
 @st.cache_data
 def load_google_sheets(sheet_url):
