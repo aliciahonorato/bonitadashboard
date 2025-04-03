@@ -30,7 +30,7 @@ st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 # Google Sheets Setup
 SHEET_URL_CUSTOMER = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?usp=sharing"  
 SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"  
-SERVICE_ACCOUNT_FILE = r"C:\Users\lica_\OneDrive\Documentos\INTERCÂMBIO CCI 2024\2024 Summer-Fall Semester\CIP\Bonita\client_secret_52289991427-88rpm95o3aic7fsk4ueb0sert5uf6l74.apps.googleusercontent.com.json"  
+SERVICE_ACCOUNT_FILE = "client_secret_52289991427-88rpm95o3aic7fsk4ueb0sert5uf6l74.apps.googleusercontent.com.json"  
 
 # Authenticate and fetch data from Google Sheets
 @st.cache_data
