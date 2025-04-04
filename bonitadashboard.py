@@ -24,24 +24,25 @@ def set_custom_css():
 
 set_custom_css()
 
-# Título do Dashboard
 st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
-# URLs das planilhas do Google Sheets
-SHEET_URL_CUSTOMER = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?usp=sharing"  
-SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"  
+# URLs das planilhas
+SHEET_URL_CUSTOMER = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?usp=sharing"
+SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"
 
-# Definição dos escopos para acesso ao Google Sheets e ao Google Drive
+# Escopos para gspread
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
+    "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Carrega as credenciais a partir dos secrets e autoriza o gspread
-credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
+# Autenticação
+credentials = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=SCOPES
+)
 gc = gspread.authorize(credentials)
 
-# Função para carregar os dados de uma Google Sheet
 @st.cache_data
 def load_google_sheets(sheet_url):
     try:
@@ -52,7 +53,7 @@ def load_google_sheets(sheet_url):
         st.error(f"Error loading Google Sheet: {e}")
         return None
 
-# Seleção entre Feedback de Clientes e Gerenciamento de Estoque
+# Seleção entre tipos de dados
 data_type = st.selectbox("Select Data Type", ["Customer Feedback", "Inventory Management"])
 
 if data_type == "Customer Feedback":
@@ -79,7 +80,7 @@ if data is not None and not data.empty:
             st.metric("Total Revenue", f"${total_revenue:,.2f}")
             st.metric("Customer Retention Rate", f"{customer_retention_rate:.2f}%")
 
-            # Gráfico de Vendas ao Longo do Tempo
+            # Gráfico de vendas ao longo do tempo
             st.write("### Sales Performance Over Time")
             sales_timeframe = st.selectbox("Choose timeframe", ["Daily", "Weekly", "Monthly"])
             if sales_timeframe == "Daily":
@@ -96,7 +97,7 @@ if data is not None and not data.empty:
             ax.set_xlabel("Time")
             st.pyplot(fig)
 
-            # Gráfico de Vendas por Região
+            # Gráfico de vendas por região
             st.write("### Sales by Region")
             sales_by_region = data.groupby("Region")["Sales"].sum()
             fig, ax = plt.subplots()
@@ -106,16 +107,16 @@ if data is not None and not data.empty:
             ax.set_xlabel("Region")
             st.pyplot(fig)
 
-            # Crescimento da Receita
+            # Crescimento da receita
             if "Growth Rate" not in data.columns:
                 data["Growth Rate"] = data["Revenue"].pct_change() * 100
 
             avg_growth_rate = data["Growth Rate"].mean()
             st.metric("Average Growth Rate", f"{avg_growth_rate:.2f}%")
 
-            # Top 5 Clientes por Receita
+            # Top 5 clientes
             st.write("### Top 5 Customers by Revenue")
             top_customers = data.groupby("Customer_ID")["Revenue"].sum().nlargest(5)
             st.table(top_customers)
-else:
-    st.write("Please upload a CSV file or connect a Google Sheet to get started.")
+
+# Removido o else que mostrava "Please upload a CSV..."
