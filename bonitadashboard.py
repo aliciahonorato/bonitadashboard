@@ -31,7 +31,7 @@ st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 # Para Inventory Management, utilizamos a URL completa
 SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"
 # Para Customer Feedback, utilizamos a chave extraída da URL
-CUSTOMER_FEEDBACK_KEY = "1ONZmz4ZLIw8-IzjeNvdJzMMKJ0EoJuLxUQqCeMzm5E"
+CUSTOMER_FEEDBACK_KEY = "1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E"
 
 # Escopos para acesso às APIs do Google Sheets e Drive
 SCOPES = [
