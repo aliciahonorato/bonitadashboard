@@ -25,8 +25,8 @@ set_custom_css()
 st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
 # File paths for local Excel files
-CUSTOMER_FEEDBACK_FILE = "/mnt/data/Bonita Brazilian Braids Customer Experience (Responses).xlsx"
-BUSINESS_TRACKING_FILE = "/mnt/data/Bonita Brazilian Braids -  Salon Business & Financial Tracking  (respostas).xlsx"
+CUSTOMER_FEEDBACK_FILE = "/mnt/data/Bonita Brazilian Braids Customer Experience (Responses)"
+BUSINESS_TRACKING_FILE = "/mnt/data/Bonita Brazilian Braids -  Salon Business & Financial Tracking  (respostas)"
 
 @st.cache_data
 def load_excel_file(file_path):
