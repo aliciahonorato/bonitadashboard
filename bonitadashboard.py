@@ -24,42 +24,48 @@ def set_custom_css():
 
 set_custom_css()
 
+# Título do Dashboard
 st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
-# URLs das planilhas
-SHEET_URL_CUSTOMER = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?usp=sharing"
+# Identificadores das planilhas:
+# Para Inventory Management, utilizamos a URL completa
 SHEET_URL_INVENTORY = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?usp=sharing"
+# Para Customer Feedback, utilizamos a chave extraída da URL
+CUSTOMER_FEEDBACK_KEY = "1ONZmz4ZLIw8-IzjeNvdJzMMKJ0EoJuLxUQqCeMzm5E"
 
-# Escopos para gspread
+# Escopos para acesso às APIs do Google Sheets e Drive
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets.readonly"
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
 ]
 
-
-# Autenticação
-credentials = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=SCOPES
-)
+# Autenticação via conta de serviço usando os secrets configurados
+credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
 gc = gspread.authorize(credentials)
 
+# Função para carregar os dados da planilha
 @st.cache_data
-def load_google_sheets(sheet_url):
+def load_google_sheets(sheet_identifier, use_key=True):
     try:
-        sheet = gc.open_by_url(sheet_url).sheet1
+        if use_key:
+            # Abre a planilha pela chave (usado para Customer Feedback)
+            sheet = gc.open_by_key(sheet_identifier).sheet1
+        else:
+            # Abre a planilha pela URL (usado para Inventory Management)
+            sheet = gc.open_by_url(sheet_identifier).sheet1
         data = pd.DataFrame(sheet.get_all_records())
         return data
     except Exception as e:
         st.error(f"Error loading Google Sheet: {e}")
         return None
 
-# Seleção entre tipos de dados
+# Seleção entre os tipos de dados
 data_type = st.selectbox("Select Data Type", ["Customer Feedback", "Inventory Management"])
 
 if data_type == "Customer Feedback":
-    data = load_google_sheets(SHEET_URL_CUSTOMER)
+    data = load_google_sheets(CUSTOMER_FEEDBACK_KEY, use_key=True)
 else:
-    data = load_google_sheets(SHEET_URL_INVENTORY)
+    data = load_google_sheets(SHEET_URL_INVENTORY, use_key=False)
 
 if data is not None and not data.empty:
     st.write(f"### Loaded Data: {data_type}")
@@ -80,43 +86,10 @@ if data is not None and not data.empty:
             st.metric("Total Revenue", f"${total_revenue:,.2f}")
             st.metric("Customer Retention Rate", f"{customer_retention_rate:.2f}%")
 
-            # Gráfico de vendas ao longo do tempo
+            # Gráfico: Vendas ao Longo do Tempo
             st.write("### Sales Performance Over Time")
             sales_timeframe = st.selectbox("Choose timeframe", ["Daily", "Weekly", "Monthly"])
             if sales_timeframe == "Daily":
                 sales_over_time = data.groupby(data["Date"].dt.date)["Sales"].sum()
             elif sales_timeframe == "Weekly":
-                sales_over_time = data.groupby(data["Date"].dt.to_period("W"))["Sales"].sum()
-            else:
-                sales_over_time = data.groupby(data["Date"].dt.to_period("M"))["Sales"].sum()
-
-            fig, ax = plt.subplots()
-            sales_over_time.plot(ax=ax, kind="line", color="#e59153")
-            ax.set_title(f"Sales ({sales_timeframe})")
-            ax.set_ylabel("Sales")
-            ax.set_xlabel("Time")
-            st.pyplot(fig)
-
-            # Gráfico de vendas por região
-            st.write("### Sales by Region")
-            sales_by_region = data.groupby("Region")["Sales"].sum()
-            fig, ax = plt.subplots()
-            sales_by_region.plot(ax=ax, kind="bar", color="#ffbb7c")
-            ax.set_title("Sales by Region")
-            ax.set_ylabel("Sales")
-            ax.set_xlabel("Region")
-            st.pyplot(fig)
-
-            # Crescimento da receita
-            if "Growth Rate" not in data.columns:
-                data["Growth Rate"] = data["Revenue"].pct_change() * 100
-
-            avg_growth_rate = data["Growth Rate"].mean()
-            st.metric("Average Growth Rate", f"{avg_growth_rate:.2f}%")
-
-            # Top 5 clientes
-            st.write("### Top 5 Customers by Revenue")
-            top_customers = data.groupby("Customer_ID")["Revenue"].sum().nlargest(5)
-            st.table(top_customers)
-
-# Removido o else que mostrava "Please upload a CSV..."
+                sales_over_time = data.groupby(data["Date"].dt.to_period("W"))["_
