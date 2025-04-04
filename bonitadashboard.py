@@ -1,15 +1,17 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 import gspread
 from google.oauth2.service_account import Credentials
-import altair as alt
-import datetime
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+import string
 
 # --------------------- Custom CSS & Branding ---------------------
 def set_custom_css():
     st.markdown("""
         <style>
-            /* Modern design with custom fonts and colors */
             body, .stText, .stTitle, .stHeader, .stMarkdown {
                 color: #faf6f5 !important;
                 font-family: 'Helvetica Neue', sans-serif;
@@ -23,7 +25,6 @@ def set_custom_css():
             .stDataFrame {
                 background-color: #7c7f46 !important;
             }
-            /* Header styling */
             .header-title {
                 font-size: 2.5rem;
                 font-weight: bold;
@@ -41,23 +42,18 @@ def set_custom_css():
 set_custom_css()
 
 # --------------------- Dashboard Title ---------------------
-st.markdown("<div class='header-title'>Bonita Brazilian Braids Dashboard</div>", unsafe_allow_html=True)
+st.markdown("<div class='header-title'>Customer Feedback Dashboard</div>", unsafe_allow_html=True)
 
 # --------------------- Google Sheets Configuration ---------------------
 CUSTOMER_FEEDBACK_URL = (
     "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/"
     "edit?resourcekey=&gid=1459096233#gid=1459096233"
 )
-INVENTORY_URL = (
-    "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/"
-    "edit?resourcekey=&gid=375516129#gid=375516129"
-)
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-
 credentials = Credentials.from_service_account_info(
     st.secrets["gcp_service_account"], 
     scopes=SCOPES
@@ -66,201 +62,184 @@ gc = gspread.authorize(credentials)
 
 @st.cache_data
 def load_google_sheet(sheet_url):
+    """Loads the first worksheet from the given Google Sheet URL into a DataFrame."""
     try:
         sheet = gc.open_by_url(sheet_url).sheet1
         data = pd.DataFrame(sheet.get_all_records())
-        data.columns = data.columns.str.strip()  # Clean column names
+        data.columns = data.columns.str.strip()
         return data
     except Exception as e:
         st.error(f"Error loading the Google Sheet: {e}")
         return None
 
-# --------------------- Data Type Selection ---------------------
-data_type = st.sidebar.selectbox("Select Data Type", ["Customer Feedback", "Inventory Management"])
+@st.cache_data
+def process_text(text_list):
+    """
+    Basic text processing:
+      - Lowercasing
+      - Tokenizing
+      - Removing stopwords and punctuation
+      - Counting word frequencies
+    Returns a DataFrame with 'word' and 'count'.
+    """
+    all_tokens = []
+    stop_words = set(stopwords.words('english'))
+    punctuation_set = set(string.punctuation)
 
-if data_type == "Customer Feedback":
-    data = load_google_sheet(CUSTOMER_FEEDBACK_URL)
-else:
-    data = load_google_sheet(INVENTORY_URL)
+    for text in text_list:
+        text = text.lower()
+        tokens = word_tokenize(text)
+        for token in tokens:
+            if token not in stop_words and token not in punctuation_set and token.isalpha():
+                all_tokens.append(token)
 
+    # Count frequencies
+    freq_dist = nltk.FreqDist(all_tokens)
+    df_freq = pd.DataFrame(freq_dist.items(), columns=["word", "count"])
+    df_freq = df_freq.sort_values("count", ascending=False).reset_index(drop=True)
+    return df_freq
+
+# --------------------- Load Data ---------------------
+data = load_google_sheet(CUSTOMER_FEEDBACK_URL)
 if data is None or data.empty:
-    st.error("No data available.")
+    st.error("No customer feedback data available.")
     st.stop()
 
-st.sidebar.markdown("### Data Preview")
+# --------------------- Data Preview & Download ---------------------
+st.subheader("Data Preview")
 st.dataframe(data.head(5))
 
-# --------------------- Layout with Tabs ---------------------
-tabs = st.tabs(["Summary", "Analysis", "Recommendations & Action Items"])
+csv_data = data.to_csv(index=False).encode("utf-8")
+st.download_button(
+    label="Download Full CSV",
+    data=csv_data,
+    file_name="customer_feedback.csv",
+    mime="text/csv"
+)
 
-# ##################################################################
-# --------------------- Tab 1: Summary ---------------------
-with tabs[0]:
-    st.markdown("## General Overview")
-    if data_type == "Inventory Management":
-        # Preprocess Inventory Data
-        data["Carimbo de data/hora"] = pd.to_datetime(data["Carimbo de data/hora"], errors='coerce')
-        total_revenue = pd.to_numeric(data["Total Revenue for the day ($)"], errors='coerce').sum()
-        total_expenses = pd.to_numeric(data["Total Expenses for the day ($)"], errors='coerce').sum()
-        net_profit = pd.to_numeric(data["Net Profit for the day ($)"], errors='coerce').sum()
-        total_appointments = pd.to_numeric(data["Number of appointments completed today:"], errors='coerce').sum()
-        total_returning = pd.to_numeric(data["Total number of returning customers today:"], errors='coerce').sum()
-        total_new = pd.to_numeric(data["Total number of new customers today:"], errors='coerce').sum()
-        retention_rate = (total_returning / (total_returning + total_new)) * 100 if (total_returning + total_new) > 0 else 0
+# --------------------- Key Insights ---------------------
+st.subheader("Key Metrics")
+total_responses = len(data)
+st.metric("Total Responses", f"{total_responses}")
 
-        # Display key metrics in columns
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Revenue", f"${total_revenue:,.2f}")
-        col2.metric("Total Expenses", f"${total_expenses:,.2f}")
-        col3.metric("Net Profit", f"${net_profit:,.2f}")
-
-        col4, col5 = st.columns(2)
-        col4.metric("Total Appointments", f"{total_appointments:.0f}")
-        col5.metric("Retention Rate", f"{retention_rate:.2f}%")
-    
-    else:
-        st.markdown("## Customer Feedback Overview")
-        if "How satisfied are you with our services?" in data.columns:
-            satisfaction_counts = data["How satisfied are you with our services?"].value_counts().to_dict()
-            st.write("### Customer Satisfaction:")
-            for level, count in satisfaction_counts.items():
-                st.write(f"- **{level}**: {count} responses")
-        st.write("Explore the following tabs for detailed analysis and actionable recommendations.")
-
-# ##################################################################
-# --------------------- Tab 2: Analysis ---------------------
-with tabs[1]:
-    st.markdown("## Detailed Analysis")
-    
-    if data_type == "Inventory Management":
-        st.markdown("### Revenue Over Time")
-        timeframe = st.selectbox("Select Timeframe", ["Daily", "Weekly", "Monthly"], key="timeframe")
-        if timeframe == "Daily":
-            rev_time = (
-                data.groupby(data["Carimbo de data/hora"].dt.date)["Total Revenue for the day ($)"]
-                .sum()
-                .reset_index()
-            )
-            rev_time.columns = ["Date", "Revenue"]
-            x_field = "Date"
-        elif timeframe == "Weekly":
-            rev_time = (
-                data.groupby(data["Carimbo de data/hora"].dt.to_period("W"))["Total Revenue for the day ($)"]
-                .sum()
-                .reset_index()
-            )
-            rev_time["Date"] = rev_time["Carimbo de data/hora"].astype(str)
-            rev_time = rev_time.drop("Carimbo de data/hora", axis=1)
-            rev_time.columns = ["Revenue", "Date"]
-            x_field = "Date"
-        else:
-            rev_time = (
-                data.groupby(data["Carimbo de data/hora"].dt.to_period("M"))["Total Revenue for the day ($)"]
-                .sum()
-                .reset_index()
-            )
-            rev_time["Date"] = rev_time["Carimbo de data/hora"].astype(str)
-            rev_time = rev_time.drop("Carimbo de data/hora", axis=1)
-            rev_time.columns = ["Revenue", "Date"]
-            x_field = "Date"
-
-        chart_rev = (
-            alt.Chart(rev_time)
-            .mark_line(point=alt.OverlayMarkDef(color="#C17544", size=80))
-            .encode(
-                x=alt.X(f"{x_field}:T", title="Date"),
-                y=alt.Y("Revenue:Q", title="Revenue ($)"),
-                tooltip=[f"{x_field}:T", "Revenue:Q"]
-            )
-            .properties(
-                title=f"Revenue Over Time ({timeframe})",
-                width=700,
-                height=400
-            )
-            .interactive()
+# If we have a satisfaction column, we can show distribution
+if "How satisfied are you with our services?" in data.columns:
+    sat_counts = data["How satisfied are you with our services?"].value_counts().reset_index()
+    sat_counts.columns = ["Satisfaction", "Count"]
+    # Create a donut chart for satisfaction distribution
+    chart_satisfaction = (
+        alt.Chart(sat_counts)
+        .mark_arc(innerRadius=50, stroke="#fff")
+        .encode(
+            theta=alt.Theta(field="Count", type="quantitative"),
+            color=alt.Color("Satisfaction:N", scale=alt.Scale(range=["#F7B26A", "#C17544", "#FFD700"])),
+            tooltip=["Satisfaction:N", "Count:Q"]
         )
-        st.altair_chart(chart_rev, use_container_width=True)
-    
+        .properties(title="Satisfaction Distribution", width=400, height=400)
+        .interactive()
+    )
+    st.altair_chart(chart_satisfaction, use_container_width=True)
+else:
+    st.write("No satisfaction data available.")
+
+# --------------------- Visit Frequency ---------------------
+if "How often do you visit a hair salon?" in data.columns:
+    freq_counts = data["How often do you visit a hair salon?"].value_counts().reset_index()
+    freq_counts.columns = ["Frequency", "Count"]
+    chart_freq = (
+        alt.Chart(freq_counts)
+        .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
+        .encode(
+            x=alt.X("Frequency:N", title="Visit Frequency"),
+            y=alt.Y("Count:Q", title="Count"),
+            tooltip=["Frequency:N", "Count:Q"]
+        )
+        .properties(title="Visit Frequency Distribution", width=700, height=400)
+        .interactive()
+    )
+    st.altair_chart(chart_freq, use_container_width=True)
+
+# --------------------- Marketing Channel ---------------------
+if "How did you hear about us?" in data.columns:
+    st.subheader("Marketing Channel Effectiveness")
+    channel_counts = data["How did you hear about us?"].value_counts().reset_index()
+    channel_counts.columns = ["Channel", "Count"]
+    chart_channel = (
+        alt.Chart(channel_counts)
+        .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
+        .encode(
+            x=alt.X("Channel:N", title="Channel"),
+            y=alt.Y("Count:Q", title="Count"),
+            tooltip=["Channel:N", "Count:Q"]
+        )
+        .properties(title="Channels Used by Customers", width=700, height=400)
+        .interactive()
+    )
+    st.altair_chart(chart_channel, use_container_width=True)
+
+# --------------------- Would You Recommend Us? ---------------------
+if "Would you recommend us to a friend?" in data.columns:
+    st.subheader("Recommendation (NPS-like) Insight")
+    rec_counts = data["Would you recommend us to a friend?"].value_counts().reset_index()
+    rec_counts.columns = ["Recommend", "Count"]
+    chart_recommend = (
+        alt.Chart(rec_counts)
+        .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
+        .encode(
+            x=alt.X("Recommend:N", title="Response"),
+            y=alt.Y("Count:Q", title="Count"),
+            tooltip=["Recommend:N", "Count:Q"]
+        )
+        .properties(title="Would You Recommend Us?", width=700, height=400)
+        .interactive()
+    )
+    st.altair_chart(chart_recommend, use_container_width=True)
+
+# --------------------- Opportunity for New Services ---------------------
+if "Is there a service you wish we offered but currently don’t?" in data.columns:
+    st.subheader("Requested Services")
+    new_services = data["Is there a service you wish we offered but currently don’t?"].dropna().tolist()
+    if new_services:
+        st.write("Top customer suggestions for new services:")
+        # Convert list to a small DataFrame with counts
+        df_new_services = pd.Series(new_services).value_counts().reset_index()
+        df_new_services.columns = ["Suggested Service", "Count"]
+        st.dataframe(df_new_services.head(5))
     else:
-        st.markdown("### Customer Feedback Analysis")
-        # Satisfaction Chart: Using a donut chart for a modern look
-        if "How satisfied are you with our services?" in data.columns:
-            satisfaction = data["How satisfied are you with our services?"].value_counts().reset_index()
-            satisfaction.columns = ["Satisfaction", "Count"]
-            chart_sat = (
-                alt.Chart(satisfaction)
-                .mark_arc(innerRadius=50, stroke="#fff")
-                .encode(
-                    theta=alt.Theta(field="Count", type="quantitative"),
-                    color=alt.Color(field="Satisfaction", type="nominal", scale=alt.Scale(range=["#F7B26A", "#C17544", "#FFD700"])),
-                    tooltip=["Satisfaction:N", "Count:Q"]
-                )
-                .properties(title="Satisfaction Distribution", width=400, height=400)
-                .interactive()
-            )
-            st.altair_chart(chart_sat, use_container_width=True)
-        
-        # Visit Frequency Chart: Bar chart with rounded corners
-        if "How often do you visit a hair salon?" in data.columns:
-            freq = data["How often do you visit a hair salon?"].value_counts().reset_index()
-            freq.columns = ["Frequency", "Count"]
-            chart_freq = (
-                alt.Chart(freq)
+        st.write("No suggestions provided.")
+
+# --------------------- Text Analysis for Improvements ---------------------
+if "What could we improve to enhance your experience?" in data.columns:
+    st.subheader("Top Words in Improvement Suggestions")
+    improvements = data["What could we improve to enhance your experience?"].dropna().tolist()
+    if improvements:
+        # Process text to get top words
+        df_word_freq = process_text(improvements)
+        if not df_word_freq.empty:
+            # Show top 10 words
+            top_words = df_word_freq.head(10)
+            chart_words = (
+                alt.Chart(top_words)
                 .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
                 .encode(
-                    x=alt.X("Frequency:N", title="Visit Frequency"),
-                    y=alt.Y("Count:Q", title="Count"),
-                    tooltip=["Frequency:N", "Count:Q"]
+                    x=alt.X("word:N", sort=None, title="Word"),
+                    y=alt.Y("count:Q", title="Count"),
+                    tooltip=["word:N", "count:Q"]
                 )
-                .properties(title="Visit Frequency Distribution", width=700, height=400)
+                .properties(title="Most Common Words in Suggestions", width=700, height=400)
                 .interactive()
             )
-            st.altair_chart(chart_freq, use_container_width=True)
-
-# ##################################################################
-# --------------------- Tab 3: Recommendations & Action Items ---------------------
-with tabs[2]:
-    st.markdown("## Recommendations & Action Items")
-    if data_type == "Inventory Management":
-        # Calculate weekly performance
-        current_week = pd.Timestamp.now().isocalendar().week
-        weekly_data = data[data["Carimbo de data/hora"].dt.isocalendar().week == current_week]
-        current_week_revenue = pd.to_numeric(weekly_data["Total Revenue for the day ($)"], errors='coerce').sum()
-        current_week_appointments = pd.to_numeric(weekly_data["Number of appointments completed today:"], errors='coerce').sum()
-
-        previous_week = current_week - 1
-        previous_week_data = data[data["Carimbo de data/hora"].dt.isocalendar().week == previous_week]
-        previous_week_revenue = pd.to_numeric(previous_week_data["Total Revenue for the day ($)"], errors='coerce').sum()
-        previous_week_appointments = pd.to_numeric(previous_week_data["Number of appointments completed today:"], errors='coerce').sum()
-
-        st.markdown("### Performance Insights")
-        # Revenue insight
-        if current_week_revenue < previous_week_revenue:
-            st.error(
-                f"Current week revenue (${current_week_revenue:,.2f}) is lower than last week's (${previous_week_revenue:,.2f}).\n"
-                "Recommendation: Increase marketing efforts, run promotions or discounts, and review customer feedback for service improvements."
-            )
+            st.altair_chart(chart_words, use_container_width=True)
         else:
-            st.success("Revenue is stable or growing. Keep up the good work!")
-        
-        # Appointments insight
-        if current_week_appointments < previous_week_appointments:
-            st.error(
-                f"Current week appointments ({current_week_appointments:.0f}) are lower than last week's ({previous_week_appointments:.0f}).\n"
-                "Recommendation: Send reminders, offer discounts, or launch loyalty programs to boost customer visits."
-            )
-        else:
-            st.success("Appointments are stable or increasing. Great job!")
-    
+            st.write("No valid words found after processing. (Check for stopwords/punctuation)")
     else:
-        st.markdown("### Customer Feedback Recommendations")
-        if "What could we improve to enhance your experience?" in data.columns:
-            improvements = data["What could we improve to enhance your experience?"].dropna().tolist()
-            if improvements:
-                st.write("Key improvement suggestions from customers:")
-                for i, feedback in enumerate(improvements[:5], start=1):
-                    st.write(f"{i}. {feedback}")
-            else:
-                st.success("No negative feedback detected. Keep up the excellent work!")
-        else:
-            st.write("Not enough data to generate recommendations.")
+        st.write("No improvement suggestions provided.")
+
+# --------------------- Additional Insights or Suggestions ---------------------
+st.subheader("Additional Observations")
+st.write(
+    "Based on the data above, you can identify key areas for service expansion, understand "
+    "customer satisfaction trends, and see which marketing channels are most effective. "
+    "Use the word frequency analysis of open-ended feedback to pinpoint common themes and "
+    "address them directly for a better customer experience."
+)
