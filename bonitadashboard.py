@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 import matplotlib.pyplot as plt
 
 def set_custom_css():
@@ -24,35 +26,45 @@ set_custom_css()
 
 st.title("Bonita Brazilian Braids Performance Indicator Dashboard")
 
-# File paths for local Excel files
-CUSTOMER_FEEDBACK_FILE = "/mnt/data/Bonita Brazilian Braids Customer Experience (Responses)"
-BUSINESS_TRACKING_FILE = "/mnt/data/Bonita Brazilian Braids -  Salon Business & Financial Tracking  (respostas)"
+# Google Sheets URLs provided
+CUSTOMER_FEEDBACK_URL = "https://docs.google.com/spreadsheets/d/1ONZmz4ZLIw8-IzjeNvdJzMMKJZ0EoJuLxUQqCeMzm5E/edit?resourcekey=&gid=1459096233#gid=1459096233"
+INVENTORY_URL = "https://docs.google.com/spreadsheets/d/1g28kftFDBk6nrgpj8qgmEH5QId5stT1p55saBTsctaU/edit?resourcekey=&gid=375516129#gid=375516129"
+
+# Set the scopes and authenticate using your service account credentials.
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
+gc = gspread.authorize(credentials)
 
 @st.cache_data
-def load_excel_file(file_path):
+def load_google_sheet(sheet_url):
     try:
-        data = pd.read_excel(file_path)
+        # Load the first sheet from the Google Sheet using its URL
+        sheet = gc.open_by_url(sheet_url).sheet1
+        data = pd.DataFrame(sheet.get_all_records())
         # Remove any extra whitespace from the column names
         data.columns = data.columns.str.strip()
         return data
     except Exception as e:
-        st.error(f"Error loading file {file_path}: {e}")
+        st.error(f"Error loading Google Sheet: {e}")
         return None
 
-# Select the data type to display
+# Let the user select which data to view
 data_type = st.selectbox("Select Data Type", ["Customer Feedback", "Inventory Management"])
 
 if data_type == "Customer Feedback":
-    data = load_excel_file(CUSTOMER_FEEDBACK_FILE)
+    data = load_google_sheet(CUSTOMER_FEEDBACK_URL)
 else:
-    data = load_excel_file(BUSINESS_TRACKING_FILE)
+    data = load_google_sheet(INVENTORY_URL)
 
 if data is not None and not data.empty:
     st.write(f"### Loaded Data: {data_type}")
     st.dataframe(data)
     
     if data_type == "Inventory Management":
-        # Define required columns for the Salon Business Tracking data
+        # Define required columns based on the Inventory Management sheet structure
         required_columns = [
             "Carimbo de data/hora",
             "Total Revenue for the day ($)",
@@ -70,7 +82,7 @@ if data is not None and not data.empty:
             # Convert the timestamp column to datetime
             data["Carimbo de data/hora"] = pd.to_datetime(data["Carimbo de data/hora"], errors='coerce')
             
-            # Calculate key metrics (ensuring numeric conversion)
+            # Convert financial columns to numeric values (in case they're read as strings)
             total_revenue = pd.to_numeric(data["Total Revenue for the day ($)"], errors='coerce').sum()
             total_expenses = pd.to_numeric(data["Total Expenses for the day ($)"], errors='coerce').sum()
             net_profit = pd.to_numeric(data["Net Profit for the day ($)"], errors='coerce').sum()
@@ -78,10 +90,7 @@ if data is not None and not data.empty:
             
             total_returning = pd.to_numeric(data["Total number of returning customers today:"], errors='coerce').sum()
             total_new = pd.to_numeric(data["Total number of new customers today:"], errors='coerce').sum()
-            if (total_returning + total_new) > 0:
-                retention_rate = (total_returning / (total_returning + total_new)) * 100
-            else:
-                retention_rate = 0
+            retention_rate = (total_returning / (total_returning + total_new)) * 100 if (total_returning + total_new) > 0 else 0
             
             st.metric("Total Revenue", f"${total_revenue:,.2f}")
             st.metric("Total Expenses", f"${total_expenses:,.2f}")
@@ -89,18 +98,18 @@ if data is not None and not data.empty:
             st.metric("Total Appointments", f"{total_appointments:.0f}")
             st.metric("Customer Retention Rate", f"{retention_rate:.2f}%")
             
-            # Chart: Revenue over time
+            # Revenue Over Time chart
             st.write("### Revenue Over Time")
             timeframe = st.selectbox("Choose timeframe", ["Daily", "Weekly", "Monthly"])
             if timeframe == "Daily":
-                rev_over_time = data.groupby(data["Carimbo de data/hora"].dt.date)["Total Revenue for the day ($)"].sum()
+                revenue_over_time = data.groupby(data["Carimbo de data/hora"].dt.date)["Total Revenue for the day ($)"].sum()
             elif timeframe == "Weekly":
-                rev_over_time = data.groupby(data["Carimbo de data/hora"].dt.to_period("W"))["Total Revenue for the day ($)"].sum()
+                revenue_over_time = data.groupby(data["Carimbo de data/hora"].dt.to_period("W"))["Total Revenue for the day ($)"].sum()
             else:
-                rev_over_time = data.groupby(data["Carimbo de data/hora"].dt.to_period("M"))["Total Revenue for the day ($)"].sum()
+                revenue_over_time = data.groupby(data["Carimbo de data/hora"].dt.to_period("M"))["Total Revenue for the day ($)"].sum()
             
             fig, ax = plt.subplots()
-            rev_over_time.plot(ax=ax, kind="line")
+            revenue_over_time.plot(ax=ax, kind="line")
             ax.set_title(f"Revenue ({timeframe})")
             ax.set_xlabel("Time")
             ax.set_ylabel("Revenue")
