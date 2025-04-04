@@ -92,4 +92,36 @@ if data is not None and not data.empty:
             if sales_timeframe == "Daily":
                 sales_over_time = data.groupby(data["Date"].dt.date)["Sales"].sum()
             elif sales_timeframe == "Weekly":
-                sales_over_time = data.groupby(data["Date"].dt.to_period("W"))["_
+                sales_over_time = data.groupby(data["Date"].dt.to_period("W"))["Sales"].sum()
+            else:
+                sales_over_time = data.groupby(data["Date"].dt.to_period("M"))["Sales"].sum()
+
+            fig, ax = plt.subplots()
+            sales_over_time.plot(ax=ax, kind="line", color="#e59153")
+            ax.set_title(f"Sales ({sales_timeframe})")
+            ax.set_ylabel("Sales")
+            ax.set_xlabel("Time")
+            st.pyplot(fig)
+
+            # Gráfico: Vendas por Região
+            st.write("### Sales by Region")
+            sales_by_region = data.groupby("Region")["Sales"].sum()
+            fig, ax = plt.subplots()
+            sales_by_region.plot(ax=ax, kind="bar", color="#ffbb7c")
+            ax.set_title("Sales by Region")
+            ax.set_ylabel("Sales")
+            ax.set_xlabel("Region")
+            st.pyplot(fig)
+
+            # Cálculo do Crescimento da Receita
+            if "Growth Rate" not in data.columns:
+                data["Growth Rate"] = data["Revenue"].pct_change() * 100
+            avg_growth_rate = data["Growth Rate"].mean()
+            st.metric("Average Growth Rate", f"{avg_growth_rate:.2f}%")
+
+            # Top 5 Clientes por Receita
+            st.write("### Top 5 Customers by Revenue")
+            top_customers = data.groupby("Customer_ID")["Revenue"].sum().nlargest(5)
+            st.table(top_customers)
+else:
+    pass
